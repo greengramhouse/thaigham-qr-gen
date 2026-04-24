@@ -88,10 +88,11 @@
 <body class="text-gray-800 flex flex-col h-screen overflow-hidden">
 
     <!-- Navbar -->
-    <nav class="shrink-0 bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center shadow-sm relative z-20">
-        <svg class="w-6 h-6 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        <h1 class="text-lg md:text-xl font-bold text-gray-800">QR Code Generator Pro</h1>
-    </nav>
+<nav class="shrink-0 bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center shadow-sm relative z-20">
+    <img src="https://res.cloudinary.com/gukkghu/image/upload/v1646575846/gukkghu/%E0%B8%87%E0%B8%B2%E0%B8%99%E0%B8%AD%E0%B8%AD%E0%B8%81%E0%B9%81%E0%B8%9A%E0%B8%9A%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B9%84%E0%B8%A1%E0%B9%88%E0%B8%A1%E0%B8%B5%E0%B8%8A%E0%B8%B7%E0%B9%88%E0%B8%AD_aytvpq.png" alt="Logo" class="w-16 h-16 mr-3 object-contain">
+    
+    <h1 class="text-lg md:text-xl font-bold text-gray-800">QR Generator Pro</h1>
+</nav>
 
     <!-- Main Workspace (Fills remaining height) -->
     <main class="flex-1 min-h-0 flex flex-col">
@@ -331,10 +332,10 @@
                                 </button>
                             </div>
 
-                            <button onclick="saveToDB()" class="w-full mt-2 bg-emerald-50 text-emerald-700 border border-emerald-200 py-2.5 md:py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors text-sm md:text-base">
+                            <!-- <button onclick="saveToDB()" class="w-full mt-2 bg-emerald-50 text-emerald-700 border border-emerald-200 py-2.5 md:py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors text-sm md:text-base">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
                                 บันทึกลงฐานข้อมูล
-                            </button>
+                            </button> -->
                         </div>
                     </div>
                 </div>
@@ -346,7 +347,7 @@
     <!-- Minimal Footer -->
     <footer class="shrink-0 bg-white border-t border-gray-200 py-3 relative z-20">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-gray-400">
-            &copy; 2026 QR Code Generator Pro. All rights reserved. <span class="hidden sm:inline">|</span> <br class="sm:hidden" /> <span class="text-choco-500">Minimal Chocolate Edition</span>
+            &copy; 2026 QR Generator Pro. All rights reserved. <span class="hidden sm:inline">|</span> <br class="sm:hidden" /> <span class="text-choco-500">Thaigham School Development</span>
         </div>
     </footer>
 
@@ -636,10 +637,10 @@
             }
         }
 
-        function saveToDB() {
-            // Mock function
-            showToast("บันทึกข้อมูลเรียบร้อยแล้ว (จำลอง)");
-        }
+        // function saveToDB() {
+        //     // Mock function
+        //     showToast("บันทึกข้อมูลเรียบร้อยแล้ว (จำลอง)");
+        // }
 
         // --- Toast Utility ---
         let toastTimeout;
