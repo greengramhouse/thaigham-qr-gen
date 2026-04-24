@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QR Code Generator Pro | โทนช็อกโกแลต</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- QR Code Styling Library -->
+    <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#5D4037', // Brown 700 (Dark Chocolate)
+                        secondary: '#795548', // Brown 500 (Milk Chocolate)
+                        choco: {
+                            50: '#EFEBE9',  // Very light brown
+                            100: '#D7CCC8', // Light brown border
+                            200: '#BCAAA4',
+                            500: '#795548',
+                            600: '#6D4C41',
+                            700: '#5D4037',
+                            800: '#4E342E',
+                            900: '#3E2723', // Deepest chocolate
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar and basic resets */
+        body { background-color: #F8FAFC; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D7CCC8; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #BCAAA4; }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .color-btn { transition: transform 0.2s; }
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn.active { ring: 2px; ring-offset: 2px; ring-color: #5D4037; border-color: transparent !important; transform: scale(1.1); }
+        .tab-btn.active { background-color: #5D4037; color: white; border-color: #5D4037; box-shadow: 0 4px 6px -1px rgba(93, 64, 55, 0.2); }
+        .tab-btn { background-color: #f3f4f6; color: #4b5563; border: 1px solid transparent; }
+        .tab-btn:hover:not(.active) { background-color: #EFEBE9; color: #5D4037; }
+        
+        #qr-canvas-container canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+
+        /* Toast Animation */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #3E2723;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 12px 16px;
+            position: fixed;
+            z-index: 50;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s, visibility 0.3s;
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 60px;
+        }
+    </style>
+</head>
+<body class="text-gray-800 flex flex-col h-screen overflow-hidden">
+
+    <!-- Navbar -->
+    <nav class="shrink-0 bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center shadow-sm relative z-20">
+        <svg class="w-6 h-6 mr-3 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        <h1 class="text-lg md:text-xl font-bold text-gray-800">QR Code Generator Pro</h1>
+    </nav>
+
+    <!-- Main Workspace (Fills remaining height) -->
+    <main class="flex-1 min-h-0 flex flex-col">
+        <div class="max-w-7xl w-full mx-auto px-4 py-4 md:py-6 flex-1 flex flex-col min-h-0">
+            
+            <!-- Banner -->
+            <div class="shrink-0 bg-primary rounded-2xl p-6 md:p-8 mb-4 md:mb-6 text-white shadow-lg relative overflow-hidden">
+                <div class="relative z-10">
+                    <h2 class="text-2xl md:text-3xl font-bold mb-1 md:mb-2">QR Code Generator Pro</h2>
+                    <p class="text-sm md:text-base text-choco-100">สร้าง QR Code อัตโนมัติพร้อมปรับแต่งดีไซน์</p>
+                </div>
+                <!-- Decorative shape -->
+                <div class="absolute right-0 top-0 w-64 h-full bg-white opacity-5 skew-x-12 transform translate-x-10"></div>
+                <div class="absolute right-20 top-0 w-32 h-full bg-choco-900 opacity-20 -skew-x-12 transform translate-x-10"></div>
+            </div>
+
+            <!-- Split Container: Scrollable Mobile / Fixed+Scrollable Desktop -->
+            <div class="flex flex-col lg:flex-row gap-6 flex-1 min-h-0 overflow-y-auto lg:overflow-hidden custom-scrollbar pb-6 lg:pb-0">
+                
+                <!-- Left Column: Controls (Scrollable independently on Desktop) -->
+                <div class="flex-[1.5] flex flex-col gap-5 md:gap-6 lg:overflow-y-auto custom-scrollbar lg:pr-3">
+                    
+                    <!-- Step 1: Data Input -->
+                    <div class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 shrink-0">
+                        <div class="flex items-center gap-3 mb-4 md:mb-5">
+                            <div class="bg-primary text-white w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs md:text-sm font-bold">1</div>
+                            <h3 class="text-base md:text-lg font-bold">เลือกประเภทข้อมูล</h3>
+                        </div>
+
+                        <!-- Horizontal Scrollable Tabs for Mobile First -->
+                        <div class="flex overflow-x-auto hide-scrollbar gap-2 mb-5 pb-2 -mx-1 px-1">
+                            <button onclick="switchTab('url')" id="tab-url" class="tab-btn active shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg> ลิงก์ URL
+                            </button>
+                            <button onclick="switchTab('promptpay')" id="tab-promptpay" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg> PromptPay
+                            </button>
+                            <button onclick="switchTab('text')" id="tab-text" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path></svg> ข้อความ
+                            </button>
+                            <button onclick="switchTab('wifi')" id="tab-wifi" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path></svg> WiFi
+                            </button>
+                            <button onclick="switchTab('phone')" id="tab-phone" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg> โทรศัพท์
+                            </button>
+                            <button onclick="switchTab('email')" id="tab-email" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> อีเมล
+                            </button>
+                        </div>
+
+                        <!-- Input Forms -->
+                        <div id="form-container">
+                            
+                            <!-- URL Form -->
+                            <div id="form-url" class="space-y-3">
+                                <label class="block text-sm font-medium text-gray-700">ลิงก์ต้นฉบับ (URL ยาว)</label>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <input type="url" id="inp-url" oninput="updateQR()" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="https://www.example.com">
+                                    <button onclick="shortenUrl()" id="btn-shorten" class="bg-choco-50 text-primary px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-choco-100 transition-colors font-medium border border-choco-100 whitespace-nowrap">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                        ย่อลิงก์
+                                    </button>
+                                </div>
+                                <p id="short-url-result" class="text-sm text-green-600 hidden font-medium flex items-center gap-1 mt-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> 
+                                    ลิงก์ที่ย่อแล้ว: <a href="#" target="_blank" id="short-url-link" class="underline break-all"></a>
+                                </p>
+                                <p class="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                    <span class="text-yellow-600">💡</span> สนับสนุนโดย is.gd (ฟรี ไม่จำกัดจำนวน)
+                                </p>
+                            </div>
+
+                            <!-- PromptPay Form -->
+                            <div id="form-promptpay" class="space-y-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์ หรือ รหัสบัตรประชาชน</label>
+                                    <input type="text" id="inp-pp-id" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0812345678" maxlength="13">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนเงิน (เว้นว่างได้ถ้าไม่ระบุ)</label>
+                                    <input type="number" id="inp-pp-amount" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0.00">
+                                </div>
+                            </div>
+
+                            <!-- Text Form -->
+                            <div id="form-text" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ข้อความของคุณ</label>
+                                <textarea id="inp-text" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none h-24" placeholder="พิมพ์ข้อความที่ต้องการ..."></textarea>
+                            </div>
+
+                            <!-- WiFi Form -->
+                            <div id="form-wifi" class="grid grid-cols-1 sm:grid-cols-2 gap-4 hidden">
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">SSID (ชื่อเครือข่าย WiFi)</label>
+                                    <input type="text" id="inp-wifi-ssid" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="My WiFi Network">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน</label>
+                                    <input type="password" id="inp-wifi-pass" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="********">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ระบบป้องกัน</label>
+                                    <select id="inp-wifi-enc" onchange="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none bg-white">
+                                        <option value="WPA">WPA/WPA2</option>
+                                        <option value="WEP">WEP</option>
+                                        <option value="nopass">ไม่มีรหัสผ่าน</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Phone Form -->
+                            <div id="form-phone" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์</label>
+                                <input type="tel" id="inp-phone" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0812345678">
+                            </div>
+
+                            <!-- Email Form -->
+                            <div id="form-email" class="space-y-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">อีเมลผู้รับ</label>
+                                    <input type="email" id="inp-email-to" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="example@mail.com">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">หัวข้อ</label>
+                                    <input type="text" id="inp-email-sub" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="ระบุหัวข้อ...">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียดข้อความ</label>
+                                    <textarea id="inp-email-body" oninput="updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none h-20" placeholder="พิมพ์ข้อความ..."></textarea>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Design Customization -->
+                    <div class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 shrink-0">
+                        <div class="flex items-center gap-3 mb-4 md:mb-5">
+                            <div class="bg-primary text-white w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs md:text-sm font-bold">2</div>
+                            <h3 class="text-base md:text-lg font-bold">ปรับแต่งดีไซน์</h3>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+                            
+                            <!-- Dots Color -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">สีคิวอาร์โค้ด</label>
+                                <div class="flex flex-wrap gap-2 items-center" id="dots-colors">
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300 active" style="background-color: #000000" onclick="setDotsColor('#000000', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #5D4037" onclick="setDotsColor('#5D4037', this)"></button> <!-- Dark Chocolate -->
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #8D6E63" onclick="setDotsColor('#8D6E63', this)"></button> <!-- Light Chocolate -->
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #10B981" onclick="setDotsColor('#10B981', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #1E3A8A" onclick="setDotsColor('#1E3A8A', this)"></button>
+                                    
+                                    <!-- Custom Color Picker -->
+                                    <div class="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300 shadow-sm cursor-pointer ml-1" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
+                                        <input type="color" id="inp-color-dots" oninput="setDotsColor(this.value, null)" onchange="setDotsColor(this.value, null)" class="absolute -top-2 -left-2 w-12 h-12 opacity-0 cursor-pointer">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Background Color -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">สีพื้นหลัง</label>
+                                <div class="flex flex-wrap gap-2 items-center" id="bg-colors">
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300 active" style="background-color: #ffffff" onclick="setBgColor('#ffffff', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #F5F5F5" onclick="setBgColor('#F5F5F5', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #EFEBE9" onclick="setBgColor('#EFEBE9', this)"></button> <!-- Tinted Cream -->
+                                    
+                                    <!-- Custom Color Picker -->
+                                    <div class="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300 shadow-sm cursor-pointer ml-1" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
+                                        <input type="color" id="inp-color-bg" value="#ffffff" oninput="setBgColor(this.value, null)" onchange="setBgColor(this.value, null)" class="absolute -top-2 -left-2 w-12 h-12 opacity-0 cursor-pointer">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pattern -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">รูปแบบจุด (Pattern)</label>
+                                <select id="inp-pattern" onchange="updateQR()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white">
+                                    <option value="square">สี่เหลี่ยมปกติ (Square)</option>
+                                    <option value="dots">จุดกลม (Dots)</option>
+                                    <option value="rounded">ขอบมน (Rounded)</option>
+                                    <option value="extra-rounded">ขอบมนมาก (Extra Rounded)</option>
+                                    <option value="classy">คลาสสิก (Classy)</option>
+                                    <option value="classy-rounded">คลาสสิกขอบมน</option>
+                                </select>
+                            </div>
+
+                            <!-- Logo Upload -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">แทรกโลโก้ตรงกลาง</label>
+                                <div class="relative">
+                                    <input type="file" id="inp-logo" accept="image/*" onchange="handleLogoUpload(event)" class="hidden">
+                                    <button onclick="document.getElementById('inp-logo').click()" class="bg-gray-50 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors w-full">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        เลือกรูปภาพ
+                                    </button>
+                                    <button id="btn-remove-logo" onclick="removeLogo()" class="hidden absolute right-0 top-0 mt-2 mr-2 bg-white text-red-500 rounded-full hover:text-red-700 text-xs shadow-sm px-2 py-1 border border-red-100">ลบโลโก้</button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Preview & Actions (Always visible/scrollable independently on Desktop) -->
+                <div class="flex-1 w-full lg:max-w-md mx-auto lg:overflow-y-auto custom-scrollbar lg:pl-2 pb-4 lg:pb-0">
+                    <div class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
+                        <h3 class="text-center font-bold text-gray-800 mb-3 md:mb-4 text-base md:text-lg">ตัวอย่าง Real-time</h3>
+                        
+                        <!-- QR Box -->
+                        <div class="bg-choco-50 rounded-xl p-4 flex items-center justify-center min-h-[250px] md:min-h-[300px] border border-choco-100 mb-5 relative overflow-hidden">
+                            <div id="qr-canvas-container" class="bg-white shadow-sm p-2 rounded-lg"></div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="space-y-3">
+                            <button onclick="shareQR()" class="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-choco-800 transition-colors shadow-md text-sm md:text-base">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                                แชร์ (Share)
+                            </button>
+
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="copyImage()" class="bg-choco-50 text-primary py-2 px-1 rounded-xl text-xs md:text-sm font-medium flex flex-col items-center justify-center gap-1 hover:bg-choco-100 transition-colors border border-choco-100">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                                    คัดลอกรูป
+                                </button>
+                                <button onclick="downloadPNG()" class="bg-gray-800 text-white py-2 px-1 rounded-xl text-xs md:text-sm font-medium flex flex-col items-center justify-center gap-1 hover:bg-gray-900 transition-colors shadow-sm">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    โหลด PNG
+                                </button>
+                                <button onclick="copyLink()" class="bg-choco-50 text-primary py-2 px-1 rounded-xl text-xs md:text-sm font-medium flex flex-col items-center justify-center gap-1 hover:bg-choco-100 transition-colors border border-choco-100">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                    คัดลอกลิงก์
+                                </button>
+                            </div>
+
+                            <button onclick="saveToDB()" class="w-full mt-2 bg-emerald-50 text-emerald-700 border border-emerald-200 py-2.5 md:py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors text-sm md:text-base">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                                บันทึกลงฐานข้อมูล
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Minimal Footer -->
+    <footer class="shrink-0 bg-white border-t border-gray-200 py-3 relative z-20">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-gray-400">
+            &copy; 2026 QR Code Generator Pro. All rights reserved. <span class="hidden sm:inline">|</span> <br class="sm:hidden" /> <span class="text-choco-500">Minimal Chocolate Edition</span>
+        </div>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="toast">ข้อความแจ้งเตือน</div>
+
+    <script>
+        // --- State ---
+        let currentTab = 'url';
+        let shortenedUrl = '';
+        let currentLogoUrl = null;
+        let qrCodeInstance = null;
+        let designState = {
+            dotsColor: '#000000',
+            bgColor: '#ffffff',
+            pattern: 'square'
+        };
+
+        // --- PromptPay CRC16 Calculation ---
+        function crc16(data) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= data.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    if ((crc & 0x8000) > 0) crc = (crc << 1) ^ 0x1021;
+                    else crc = crc << 1;
+                }
+            }
+            return crc.toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        function generatePromptPayPayload(id, amount) {
+            let target = id.replace(/[^0-9]/g, '');
+            if(!target) return ' ';
+            let idType = target.length >= 13 ? '02' : '01';
+            
+            if (idType === '01') {
+                target = target.length === 10 ? '0066' + target.substring(1) : target;
+            }
+
+            const targetLen = target.length.toString().padStart(2, '0');
+            const merchantInfo = `0016A000000677010111${idType}${targetLen}${target}`;
+            const merchantInfoLen = merchantInfo.length.toString().padStart(2, '0');
+            
+            let payload = `00020101021129${merchantInfoLen}${merchantInfo}5802TH5303764`;
+            
+            if (amount && amount > 0) {
+                const amountStr = parseFloat(amount).toFixed(2);
+                const amountLen = amountStr.length.toString().padStart(2, '0');
+                payload += `54${amountLen}${amountStr}`;
+            }
+            
+            payload += `6304`;
+            return payload + crc16(payload);
+        }
+
+        // --- QR Code Initialization ---
+        function initQR() {
+            qrCodeInstance = new QRCodeStyling({
+                width: 250,
+                height: 250,
+                data: "https://www.example.com",
+                margin: 5,
+                qrOptions: { typeNumber: 0, mode: "Byte", errorCorrectionLevel: "Q" },
+                imageOptions: { hideBackgroundDots: true, imageSize: 0.4, margin: 5 },
+                dotsOptions: { type: designState.pattern, color: designState.dotsColor },
+                backgroundOptions: { color: designState.bgColor }
+            });
+            qrCodeInstance.append(document.getElementById("qr-canvas-container"));
+            updateQR(); // Initial update
+        }
+
+        // --- Payload Generation based on Tab ---
+        function getPayload() {
+            switch(currentTab) {
+                case 'url':
+                    const rawUrl = document.getElementById('inp-url').value;
+                    return shortenedUrl || rawUrl || ' ';
+                case 'promptpay':
+                    const ppId = document.getElementById('inp-pp-id').value;
+                    const ppAmt = document.getElementById('inp-pp-amount').value;
+                    return generatePromptPayPayload(ppId, ppAmt) || ' ';
+                case 'text':
+                    return document.getElementById('inp-text').value || ' ';
+                case 'wifi':
+                    const ssid = document.getElementById('inp-wifi-ssid').value;
+                    const pass = document.getElementById('inp-wifi-pass').value;
+                    const enc = document.getElementById('inp-wifi-enc').value;
+                    if(!ssid) return ' ';
+                    const escape = (str) => str.replace(/([\\;:])/g, "\\$1");
+                    return `WIFI:T:${enc};S:${escape(ssid)};P:${escape(pass)};;`;
+                case 'phone':
+                    const phone = document.getElementById('inp-phone').value;
+                    return phone ? `tel:${phone}` : ' ';
+                case 'email':
+                    const to = document.getElementById('inp-email-to').value;
+                    const sub = document.getElementById('inp-email-sub').value;
+                    const body = document.getElementById('inp-email-body').value;
+                    if(!to) return ' ';
+                    return `mailto:${to}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
+                default: return ' ';
+            }
+        }
+
+        // --- Update QR Code Realtime ---
+        function updateQR() {
+            if(!qrCodeInstance) return;
+            const payload = getPayload();
+            designState.pattern = document.getElementById('inp-pattern').value;
+
+            qrCodeInstance.update({
+                data: payload,
+                dotsOptions: { color: designState.dotsColor, type: designState.pattern },
+                backgroundOptions: { color: designState.bgColor },
+                image: currentLogoUrl
+            });
+        }
+
+        // --- URL Shortener ---
+        async function shortenUrl() {
+            const urlInput = document.getElementById('inp-url').value;
+            if(!urlInput) {
+                showToast("กรุณากรอก URL ก่อนย่อลิงก์");
+                return;
+            }
+            
+            const btn = document.getElementById('btn-shorten');
+            btn.innerHTML = '<svg class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังย่อ...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(urlInput)}`);
+                const data = await res.json();
+                if(data.shorturl) {
+                    shortenedUrl = data.shorturl;
+                    
+                    // Show success UI
+                    const resContainer = document.getElementById('short-url-result');
+                    const linkEl = document.getElementById('short-url-link');
+                    linkEl.href = shortenedUrl;
+                    linkEl.textContent = shortenedUrl;
+                    resContainer.classList.remove('hidden');
+                    
+                    showToast("ย่อลิงก์สำเร็จ!");
+                    updateQR();
+                } else {
+                    showToast("ไม่สามารถย่อลิงก์ได้");
+                }
+            } catch(e) {
+                showToast("เกิดข้อผิดพลาดในการเชื่อมต่อ is.gd");
+            } finally {
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg> ย่อลิงก์';
+                btn.disabled = false;
+            }
+        }
+
+        // --- Event Handlers & UI Updates ---
+        function switchTab(tabId) {
+            currentTab = tabId;
+            shortenedUrl = ''; // reset short url
+            document.getElementById('short-url-result').classList.add('hidden');
+
+            // Update Tabs UI
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            activeTab.classList.add('active');
+            
+            // Auto scroll to make tab visible on mobile
+            activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+            // Update Forms UI
+            const forms = ['url', 'promptpay', 'text', 'wifi', 'phone', 'email'];
+            forms.forEach(f => {
+                document.getElementById(`form-${f}`).classList.add('hidden');
+            });
+            document.getElementById(`form-${tabId}`).classList.remove('hidden');
+
+            updateQR();
+        }
+
+        function setDotsColor(color, btnEl) {
+            designState.dotsColor = color;
+            
+            // Update Active state for color buttons
+            const container = document.getElementById('dots-colors');
+            container.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            if(btnEl) btnEl.classList.add('active');
+
+            updateQR();
+        }
+
+        function setBgColor(color, btnEl) {
+            designState.bgColor = color;
+            
+            // Update Active state for color buttons
+            const container = document.getElementById('bg-colors');
+            container.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            if(btnEl) btnEl.classList.add('active');
+
+            updateQR();
+        }
+
+        function handleLogoUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                currentLogoUrl = event.target.result;
+                document.getElementById('btn-remove-logo').classList.remove('hidden');
+                updateQR();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeLogo() {
+            currentLogoUrl = null;
+            document.getElementById('inp-logo').value = '';
+            document.getElementById('btn-remove-logo').classList.add('hidden');
+            updateQR();
+        }
+
+        // --- Actions ---
+        function downloadPNG() {
+            if(qrCodeInstance) {
+                qrCodeInstance.download({ name: "qrcode_pro", extension: "png" });
+                showToast("ดาวน์โหลดสำเร็จ!");
+            }
+        }
+
+        async function copyImage() {
+            const canvas = document.querySelector('#qr-canvas-container canvas');
+            if(!canvas) return;
+            
+            try {
+                canvas.toBlob(async (blob) => {
+                    try {
+                        const item = new ClipboardItem({ "image/png": blob });
+                        await navigator.clipboard.write([item]);
+                        showToast("คัดลอกรูปภาพแล้ว");
+                    } catch(err) {
+                        showToast("เบราว์เซอร์ของคุณไม่รองรับการคัดลอกรูปภาพ");
+                    }
+                });
+            } catch(e) {
+                showToast("เกิดข้อผิดพลาด");
+            }
+        }
+
+        function copyLink() {
+            const data = getPayload();
+            if(data && data.trim() !== '') {
+                // Fallback for clipboard
+                const el = document.createElement('textarea');
+                el.value = data;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                showToast("คัดลอกข้อมูล/ลิงก์แล้ว");
+            } else {
+                showToast("ไม่มีข้อมูลให้คัดลอก");
+            }
+        }
+
+        async function shareQR() {
+            const canvas = document.querySelector('#qr-canvas-container canvas');
+            if (navigator.share && canvas) {
+                canvas.toBlob(async (blob) => {
+                    const file = new File([blob], "qrcode.png", { type: "image/png" });
+                    try {
+                        await navigator.share({
+                            title: 'แชร์ QR Code',
+                            files: [file]
+                        });
+                    } catch(e) {
+                        // Fallback share text
+                        const data = getPayload();
+                        if(data.length < 200) {
+                             navigator.share({ title: 'QR Data', text: data }).catch(console.error);
+                        } else {
+                            showToast("แชร์รูปถูกยกเลิก หรือไม่รองรับ");
+                        }
+                    }
+                });
+            } else {
+                showToast("อุปกรณ์นี้ไม่รองรับการแชร์โดยตรง");
+            }
+        }
+
+        function saveToDB() {
+            // Mock function
+            showToast("บันทึกข้อมูลเรียบร้อยแล้ว (จำลอง)");
+        }
+
+        // --- Toast Utility ---
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = "show";
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // --- Init on Load ---
+        window.onload = initQR;
+    </script>
+</body>
+</html>
