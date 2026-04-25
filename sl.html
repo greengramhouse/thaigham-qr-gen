@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ไทยงาม QR Generator Pro</title>
+    <meta property="og:title" content="ไทยงาม QR Generator Pro" />
+    <meta property="og:image" content="https://res.cloudinary.com/gukkghu/image/upload/v1646575846/gukkghu/%E0%B8%87%E0%B8%B2%E0%B8%99%E0%B8%AD%E0%B8%AD%E0%B8%81%E0%B9%81%E0%B8%9A%E0%B8%9A%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B9%84%E0%B8%A1%E0%B9%88%E0%B8%A1%E0%B8%B5%E0%B8%8A%E0%B8%B7%E0%B9%88%E0%B8%AD_aytvpq.png" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- QR Code Styling Library -->
+    <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <!-- HTML2Canvas for capturing Frames -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#5D4037', // Brown 700
+                        secondary: '#795548', // Brown 500
+                        choco: {
+                            50: '#EFEBE9',
+                            100: '#D7CCC8',
+                            200: '#BCAAA4',
+                            500: '#795548',
+                            600: '#6D4C41',
+                            700: '#5D4037',
+                            800: '#4E342E',
+                            900: '#3E2723',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F8FAFC; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D7CCC8; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #BCAAA4; }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .color-btn { transition: transform 0.2s; }
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn.active { ring: 2px; ring-offset: 2px; ring-color: #5D4037; border-color: transparent !important; transform: scale(1.1); }
+        .tab-btn.active { background-color: #5D4037; color: white; border-color: #5D4037; box-shadow: 0 4px 6px -1px rgba(93, 64, 55, 0.2); }
+        .tab-btn { background-color: #f3f4f6; color: #4b5563; border: 1px solid transparent; }
+        .tab-btn:hover:not(.active) { background-color: #EFEBE9; color: #5D4037; }
+        
+        #qr-canvas-container canvas, #qr-canvas-container svg {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #3E2723;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 12px 16px;
+            position: fixed;
+            z-index: 9999;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s, visibility 0.3s;
+        }
+        #toast.show { visibility: visible; opacity: 1; bottom: 60px; }
+
+        /* Modal Transitions */
+        .modal-enter { opacity: 0; pointer-events: none; }
+        .modal-enter-active { opacity: 1; pointer-events: auto; transition: opacity 0.3s ease; }
+    </style>
+</head>
+<body class="text-gray-800 flex flex-col h-screen overflow-hidden">
+
+    <!-- Redirect Overlay (Shows when a short link is clicked) -->
+    <div id="redirect-overlay" class="fixed inset-0 bg-white z-[99999] flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mb-4" id="redirect-spinner"></div>
+        <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-2">กำลังพาคุณไปยังเว็บเป้าหมาย...</h2>
+        <p class="text-sm text-gray-500 mb-6">กรุณารอสักครู่</p>
+        <p id="redirect-error" class="text-red-500 font-medium hidden text-center px-4 mb-4">ไม่พบลิงก์นี้ในระบบ หรือลิงก์อาจหมดอายุไปแล้ว</p>
+        <button id="btn-redirect-home" onclick="window.location.href=window.location.origin+window.location.pathname" class="hidden px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-choco-800 transition">กลับไปยังหน้าสร้าง QR Code</button>
+    </div>
+
+    <!-- Script to intercept URL early and show loading -->
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('l')) {
+            document.getElementById('redirect-overlay').classList.remove('hidden');
+        }
+    </script>
+
+    <!-- Navbar -->
+    <nav class="shrink-0 bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between shadow-sm relative z-20">
+        <div class="flex items-center">
+            <img src="https://res.cloudinary.com/gukkghu/image/upload/v1646575846/gukkghu/%E0%B8%87%E0%B8%B2%E0%B8%99%E0%B8%AD%E0%B8%AD%E0%B8%81%E0%B9%81%E0%B8%9A%E0%B8%9A%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B9%84%E0%B8%A1%E0%B9%88%E0%B8%A1%E0%B8%B5%E0%B8%8A%E0%B8%B7%E0%B9%88%E0%B8%AD_aytvpq.png" alt="Logo" class="w-10 h-10 md:w-12 md:h-12 mr-3 object-contain">
+            <h1 class="text-lg md:text-xl font-bold text-gray-800">QR Generator Pro</h1>
+        </div>
+        
+        <!-- Auth Area -->
+        <div id="auth-container" class="flex items-center gap-3">
+            <button id="btn-login" class="bg-choco-50 text-primary border border-choco-200 px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-choco-100 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/></svg>
+                เข้าสู่ระบบ
+            </button>
+            <div id="user-menu" class="hidden items-center gap-2">
+                <button onclick="window.openHistoryModal()" class="text-sm font-medium text-choco-700 bg-choco-50 px-3 py-1.5 rounded-lg hover:bg-choco-100 transition flex items-center gap-1 border border-choco-100">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    ประวัติของฉัน
+                </button>
+                <img id="user-avatar" src="" alt="Avatar" class="w-8 h-8 rounded-full border border-gray-200">
+                <button id="btn-logout" class="text-xs text-gray-500 hover:text-red-500 underline ml-1">ออกระบบ</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 min-h-0 flex flex-col">
+        <div class="max-w-screen-2xl w-full mx-auto px-4 py-4 md:py-6 flex-1 flex flex-col min-h-0">
+            
+            <!-- Banner -->
+            <div class="shrink-0 bg-primary rounded-2xl p-6 md:p-8 mb-4 md:mb-6 text-white shadow-lg relative overflow-hidden">
+                <div class="relative z-10">
+                    <h2 class="text-2xl md:text-3xl font-bold mb-1 md:mb-2">QR Code Generator Pro</h2>
+                    <p class="text-sm md:text-base text-choco-100">สร้าง QR Code อัตโนมัติพร้อมปรับแต่งดีไซน์และกรอบ บันทึกออนไลน์ด้วย Firebase</p>
+                </div>
+                <div class="absolute right-0 top-0 w-64 h-full bg-white opacity-5 skew-x-12 transform translate-x-10"></div>
+                <div class="absolute right-20 top-0 w-32 h-full bg-choco-900 opacity-20 -skew-x-12 transform translate-x-10"></div>
+            </div>
+
+            <!-- Split Container -->
+            <div class="flex flex-col lg:flex-row gap-6 flex-1 min-h-0 overflow-y-auto lg:overflow-hidden custom-scrollbar pb-6 lg:pb-0">
+                
+                <!-- Left Column: Controls -->
+                <div class="flex-[1.5] flex flex-col gap-5 md:gap-6 lg:overflow-y-auto custom-scrollbar lg:pr-3">
+                    
+                    <!-- Step 1: Data Input -->
+                    <div class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 shrink-0">
+                        <div class="flex items-center gap-3 mb-4 md:mb-5">
+                            <div class="bg-primary text-white w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs md:text-sm font-bold">1</div>
+                            <h3 class="text-base md:text-lg font-bold">เลือกประเภทข้อมูล</h3>
+                        </div>
+
+                        <!-- Horizontal Scrollable Tabs -->
+                        <div class="flex overflow-x-auto hide-scrollbar gap-2 mb-5 pb-2 -mx-1 px-1">
+                            <button onclick="window.switchTab('url')" id="tab-url" class="tab-btn active shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg> ลิงก์ URL
+                            </button>
+                            <button onclick="window.switchTab('promptpay')" id="tab-promptpay" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg> PromptPay
+                            </button>
+                            <button onclick="window.switchTab('vcard')" id="tab-vcard" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path></svg> นามบัตร
+                            </button>
+                            <button onclick="window.switchTab('text')" id="tab-text" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path></svg> ข้อความ
+                            </button>
+                            <button onclick="window.switchTab('wifi')" id="tab-wifi" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path></svg> WiFi
+                            </button>
+                            <button onclick="window.switchTab('phone')" id="tab-phone" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg> โทรศัพท์
+                            </button>
+                            <button onclick="window.switchTab('email')" id="tab-email" class="tab-btn shrink-0 flex items-center justify-center gap-2 py-2 px-4 md:py-2.5 rounded-xl font-medium transition-all text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> อีเมล
+                            </button>
+                        </div>
+
+                        <!-- Input Forms -->
+                        <div id="form-container">
+                            <!-- URL Form -->
+                            <div id="form-url" class="space-y-3">
+                                <label class="block text-sm font-medium text-gray-700">ลิงก์ต้นฉบับ (URL ยาว)</label>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <input type="url" id="inp-url" oninput="window.updateQR()" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="https://www.example.com">
+                                    <button onclick="window.shortenUrl()" id="btn-shorten" class="bg-choco-50 text-primary px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-choco-100 transition-colors font-medium border border-choco-100 whitespace-nowrap">
+                                        ย่อลิงก์
+                                    </button>
+                                </div>
+                                <p id="short-url-result" class="text-sm text-green-600 hidden font-medium flex items-center gap-1 mt-2">
+                                    ลิงก์ที่ย่อแล้ว: <a href="#" target="_blank" id="short-url-link" class="underline break-all"></a>
+                                </p>
+                            </div>
+
+                            <!-- PromptPay Form -->
+                            <div id="form-promptpay" class="space-y-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์ หรือ รหัสบัตรประชาชน</label>
+                                    <input type="text" id="inp-pp-id" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0812345678" maxlength="15">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนเงิน (เว้นว่างได้ถ้าไม่ระบุ)</label>
+                                    <input type="number" id="inp-pp-amount" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0.00">
+                                </div>
+                            </div>
+
+                            <!-- vCard Form -->
+                            <div id="form-vcard" class="space-y-4 hidden">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ</label>
+                                        <input type="text" id="inp-vc-fname" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="John">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">นามสกุล</label>
+                                        <input type="text" id="inp-vc-lname" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="Doe">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์</label>
+                                        <input type="tel" id="inp-vc-phone" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0812345678">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
+                                        <input type="email" id="inp-vc-email" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="mail@example.com">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">บริษัท / องค์กร</label>
+                                    <input type="text" id="inp-vc-company" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="Company Ltd.">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ที่อยู่</label>
+                                    <input type="text" id="inp-vc-address" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="123/45 ถนน... เขต... จังหวัด...">
+                                </div>
+                            </div>
+
+                            <!-- Text Form -->
+                            <div id="form-text" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ข้อความของคุณ</label>
+                                <textarea id="inp-text" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none h-24" placeholder="พิมพ์ข้อความที่ต้องการ..."></textarea>
+                            </div>
+
+                            <!-- WiFi Form -->
+                            <div id="form-wifi" class="grid grid-cols-1 sm:grid-cols-2 gap-4 hidden">
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">SSID (ชื่อเครือข่าย WiFi)</label>
+                                    <input type="text" id="inp-wifi-ssid" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="My WiFi Network">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน</label>
+                                    <input type="password" id="inp-wifi-pass" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="********">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ระบบป้องกัน</label>
+                                    <select id="inp-wifi-enc" onchange="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none bg-white">
+                                        <option value="WPA">WPA/WPA2</option>
+                                        <option value="WEP">WEP</option>
+                                        <option value="nopass">ไม่มีรหัสผ่าน</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Phone Form -->
+                            <div id="form-phone" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์</label>
+                                <input type="tel" id="inp-phone" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="0812345678">
+                            </div>
+
+                            <!-- Email Form -->
+                            <div id="form-email" class="space-y-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">อีเมลผู้รับ</label>
+                                    <input type="email" id="inp-email-to" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="example@mail.com">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">หัวข้อ</label>
+                                    <input type="text" id="inp-email-sub" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" placeholder="ระบุหัวข้อ...">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียดข้อความ</label>
+                                    <textarea id="inp-email-body" oninput="window.updateQR()" class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none h-20" placeholder="พิมพ์ข้อความ..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Design Customization -->
+                    <div class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 shrink-0">
+                        <div class="flex items-center gap-3 mb-4 md:mb-5">
+                            <div class="bg-primary text-white w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs md:text-sm font-bold">2</div>
+                            <h3 class="text-base md:text-lg font-bold">ปรับแต่งดีไซน์</h3>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+                            
+                            <!-- Dots Color & Gradient -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-sm font-medium text-gray-700">สีคิวอาร์โค้ด</label>
+                                    <label class="flex items-center text-xs text-gray-500 cursor-pointer hover:text-primary">
+                                        <input type="checkbox" id="inp-use-gradient" onchange="window.toggleGradient()" class="mr-1 accent-primary"> ไล่สี (Gradient)
+                                    </label>
+                                </div>
+                                <div class="flex flex-wrap gap-2 items-center" id="dots-colors">
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300 active" style="background-color: #000000" onclick="window.setDotsColor('#000000', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #5D4037" onclick="window.setDotsColor('#5D4037', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #8D6E63" onclick="window.setDotsColor('#8D6E63', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #10B981" onclick="window.setDotsColor('#10B981', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #1E3A8A" onclick="window.setDotsColor('#1E3A8A', this)"></button>
+                                    
+                                    <!-- Custom Color Picker 1 -->
+                                    <div class="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300 shadow-sm cursor-pointer ml-1" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
+                                        <input type="color" id="inp-color-dots" oninput="window.setDotsColor(this.value, null)" onchange="window.setDotsColor(this.value, null)" class="absolute -top-2 -left-2 w-12 h-12 opacity-0 cursor-pointer">
+                                    </div>
+
+                                    <!-- Custom Color Picker 2 (For Gradient) -->
+                                    <span id="gradient-color-2-container" class="hidden flex items-center gap-1 ml-1 pl-2 border-l border-gray-200">
+                                        <span class="text-[10px] text-gray-400">สี 2</span>
+                                        <input type="color" id="inp-color-dots-2" value="#D97706" oninput="window.setDotsColor2(this.value)" class="w-8 h-8 cursor-pointer rounded border border-gray-300 shadow-sm p-0 border-none bg-transparent">
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Background Color -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">สีพื้นหลัง</label>
+                                <div class="flex flex-wrap gap-2 items-center" id="bg-colors">
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300 active" style="background-color: #ffffff" onclick="window.setBgColor('#ffffff', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #F5F5F5" onclick="window.setBgColor('#F5F5F5', this)"></button>
+                                    <button class="color-btn w-8 h-8 rounded-full border border-gray-300" style="background-color: #EFEBE9" onclick="window.setBgColor('#EFEBE9', this)"></button>
+                                    
+                                    <div class="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300 shadow-sm cursor-pointer ml-1" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
+                                        <input type="color" id="inp-color-bg" value="#ffffff" oninput="window.setBgColor(this.value, null)" onchange="window.setBgColor(this.value, null)" class="absolute -top-2 -left-2 w-12 h-12 opacity-0 cursor-pointer">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Pattern -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">รูปแบบจุด (Pattern)</label>
+                                <select id="inp-pattern" onchange="window.updateQR()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white">
+                                    <option value="square">สี่เหลี่ยมปกติ (Square)</option>
+                                    <option value="dots">จุดกลม (Dots)</option>
+                                    <option value="rounded">ขอบมน (Rounded)</option>
+                                    <option value="extra-rounded">ขอบมนมาก (Extra Rounded)</option>
+                                    <option value="classy">คลาสสิก (Classy)</option>
+                                    <option value="classy-rounded">คลาสสิกขอบมน</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Frame Customization -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">กรอบข้อความ (Frame)</label>
+                                <select id="inp-frame-type" onchange="window.updateFramePreview()" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-2 focus:ring-2 focus:ring-primary outline-none bg-white">
+                                    <option value="none">ไม่มีกรอบ</option>
+                                    <option value="rounded">กรอบขอบมน (มีข้อความ)</option>
+                                    <option value="square">กรอบสี่เหลี่ยม (มีข้อความ)</option>
+                                </select>
+                                <div id="frame-text-input-group" class="hidden space-y-2">
+                                    <input type="text" id="inp-frame-text" oninput="window.updateFramePreview()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" placeholder="SCAN ME หรือ สแกนจ่ายเงิน">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm text-gray-700">สีของกรอบ:</span>
+                                        <input type="color" id="inp-frame-color" value="#5D4037" oninput="window.updateFramePreview()" class="w-8 h-8 cursor-pointer rounded border border-gray-300 p-0 bg-transparent">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Logo Upload -->
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">แทรกโลโก้</label>
+                                <div class="relative">
+                                    <input type="file" id="inp-logo" accept="image/*" onchange="window.handleLogoUpload(event)" class="hidden">
+                                    <button onclick="document.getElementById('inp-logo').click()" class="bg-gray-50 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-100 transition w-full">
+                                        เลือกรูปภาพ
+                                    </button>
+                                    <button id="btn-remove-logo" onclick="window.removeLogo()" class="hidden absolute right-0 top-0 mt-2 mr-2 bg-white text-red-500 rounded-full hover:text-red-700 text-xs shadow-sm px-2 py-1 border border-red-100">ลบโลโก้</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Preview & Actions -->
+                <div class="flex-1 w-full lg:max-w-md mx-auto lg:overflow-y-auto custom-scrollbar lg:pl-2 pb-4 lg:pb-0">
+                    <div class="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 sticky top-0">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-center font-bold text-gray-800 text-base md:text-lg">ตัวอย่าง Real-time</h3>
+                        </div>
+                        
+                        <!-- QR Box (with Frame Zone) -->
+                        <div class="bg-choco-50 rounded-xl p-4 flex flex-col items-center justify-center min-h-[300px] border border-choco-100 mb-5 overflow-hidden">
+                            <!-- This zone will be captured by html2canvas -->
+                            <div id="qr-frame-export-zone" class="relative inline-flex flex-col items-center justify-center rounded-none bg-transparent">
+                                <!-- CTA Text inside Frame -->
+                                <div id="qr-frame-text-box" class="w-full text-center font-bold text-white py-1.5 px-4 hidden text-lg md:text-xl tracking-wider">
+                                    SCAN ME
+                                </div>
+                                <!-- Pure QR Canvas -->
+                                <div id="qr-canvas-container" class="bg-white p-2 flex items-center justify-center rounded-lg relative z-10 transition-all duration-300"></div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="space-y-3">
+                            <button onclick="window.shareQR()" class="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-choco-800 transition shadow-md text-sm md:text-base">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                                แชร์ (Share)
+                            </button>
+
+                            <div class="grid grid-cols-4 gap-2">
+                                <button onclick="window.copyImage()" class="bg-choco-50 text-primary py-2 px-1 rounded-xl text-xs md:text-[11px] lg:text-xs font-medium flex flex-col items-center justify-center gap-1 hover:bg-choco-100 transition border border-choco-100">
+                                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                                    ก๊อปปี้รูป
+                                </button>
+                                <button onclick="window.copyLink()" class="bg-choco-50 text-primary py-2 px-1 rounded-xl text-xs md:text-[11px] lg:text-xs font-medium flex flex-col items-center justify-center gap-1 hover:bg-choco-100 transition border border-choco-100">
+                                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                    ก๊อปปี้ลิงก์
+                                </button>
+                                <button onclick="window.downloadPNG()" class="bg-gray-800 text-white py-2 px-1 rounded-xl text-xs md:text-[11px] lg:text-xs font-medium flex flex-col items-center justify-center gap-1 hover:bg-gray-900 transition shadow-sm">
+                                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    โหลด PNG
+                                </button>
+                                <button onclick="window.downloadSVG()" class="bg-indigo-600 text-white py-2 px-1 rounded-xl text-xs md:text-[11px] lg:text-xs font-medium flex flex-col items-center justify-center gap-1 hover:bg-indigo-700 transition shadow-sm">
+                                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                    โหลด SVG
+                                </button>
+                            </div>
+
+                            <button id="btn-save-db" class="w-full mt-2 bg-emerald-50 text-emerald-700 border border-emerald-200 py-2.5 md:py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors text-sm md:text-base">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                                บันทึกลงฐานข้อมูลคลาวด์
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Minimal Footer -->
+    <footer class="shrink-0 bg-white border-t border-gray-200 py-3 relative z-20">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs md:text-sm text-gray-400">
+            &copy; 2026 ไทยงาม QR Generator Pro All rights reserved. <span class="hidden sm:inline">|</span> <br class="sm:hidden" /> <span class="text-choco-500">Thaigham School Development</span>
+        </div>
+    </footer>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="fixed inset-0 bg-black/60 z-50 modal-enter flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-choco-50">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    ประวัติคิวอาร์โค้ดของฉัน
+                </h2>
+                <button onclick="window.closeHistoryModal()" class="text-gray-400 hover:text-gray-700 bg-white rounded-full p-1 shadow-sm">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- History Content -->
+            <div class="p-6 overflow-y-auto flex-1 bg-gray-50 custom-scrollbar relative">
+                <div id="history-loading" class="absolute inset-0 bg-gray-50/80 flex items-center justify-center hidden z-10">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+                
+                <div id="history-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Cards will be injected here -->
+                </div>
+                
+                <div id="history-empty" class="hidden text-center py-10 text-gray-500">
+                    <svg class="w-16 h-16 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                    ยังไม่มีประวัติการสร้าง QR Code
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">ข้อความแจ้งเตือน</div>
+
+    <!-- UI Interactions Script -->
+    <script>
+        window.currentTab = 'url';
+        window.shortenedUrl = '';
+        window.currentLogoUrl = null;
+        window.qrCodeInstance = null;
+        window.designState = {
+            dotsColor: '#000000',
+            dotsColor2: '#D97706',
+            bgColor: '#ffffff',
+            pattern: 'square',
+            useGradient: false,
+            frameType: 'none',
+            frameText: 'SCAN ME',
+            frameColor: '#5D4037'
+        };
+
+        window.closeHistoryModal = function() {
+            document.getElementById('history-modal').classList.remove('modal-enter-active');
+        }
+
+        // Fixed CRC16 for PromptPay
+        function crc16(data) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= (data.charCodeAt(i) << 8);
+                for (let j = 0; j < 8; j++) {
+                    if ((crc & 0x8000) !== 0) crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+                    else crc = (crc << 1) & 0xFFFF;
+                }
+            }
+            return crc.toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        window.generatePromptPayPayload = function(id, amount) {
+            let target = id.replace(/[^0-9]/g, '');
+            if (!target) return ' ';
+
+            let idType = '01';
+            if (target.length >= 15) idType = '03';
+            else if (target.length >= 13) idType = '02';
+
+            if (idType === '01') {
+                if (target.length === 10) target = '0066' + target.substring(1);
+                else if (target.startsWith('66') && target.length === 11) target = '00' + target;
+            }
+
+            const targetLen = target.length.toString().padStart(2, '0');
+            const merchantInfo = `0016A000000677010111${idType}${targetLen}${target}`;
+            const merchantInfoLen = merchantInfo.length.toString().padStart(2, '0');
+            const poi = (amount && amount > 0) ? '12' : '11';
+
+            let payload = `0002010102${poi}29${merchantInfoLen}${merchantInfo}5802TH5303764`;
+
+            if (amount && amount > 0) {
+                const amountStr = parseFloat(amount).toFixed(2);
+                const amountLen = amountStr.length.toString().padStart(2, '0');
+                payload += `54${amountLen}${amountStr}`;
+            }
+
+            payload += `6304`;
+            return payload + crc16(payload);
+        }
+
+        function getDotsOptions(state) {
+            let opts = { type: state.pattern };
+            if (state.useGradient) {
+                opts.gradient = {
+                    type: 'linear',
+                    rotation: Math.PI / 4,
+                    colorStops: [
+                        { offset: 0, color: state.dotsColor },
+                        { offset: 1, color: state.dotsColor2 }
+                    ]
+                };
+            } else {
+                opts.color = state.dotsColor;
+            }
+            return opts;
+        }
+
+        function initQR() {
+            window.qrCodeInstance = new QRCodeStyling({
+                width: 250,
+                height: 250,
+                data: "https://www.example.com",
+                margin: 0,
+                qrOptions: { typeNumber: 0, mode: "Byte", errorCorrectionLevel: "Q" },
+                imageOptions: { hideBackgroundDots: true, imageSize: 0.4, margin: 5 },
+                dotsOptions: getDotsOptions(window.designState),
+                backgroundOptions: { color: window.designState.bgColor }
+            });
+            window.qrCodeInstance.append(document.getElementById("qr-canvas-container"));
+            window.updateFramePreview();
+            window.updateQR();
+        }
+
+        window.getPayload = function() {
+            switch(window.currentTab) {
+                case 'url':
+                    const rawUrl = document.getElementById('inp-url').value;
+                    return window.shortenedUrl || rawUrl || ' ';
+                case 'promptpay':
+                    return window.generatePromptPayPayload(document.getElementById('inp-pp-id').value, document.getElementById('inp-pp-amount').value);
+                
+                case 'vcard':
+                    const fname = document.getElementById('inp-vc-fname').value.trim();
+                    const lname = document.getElementById('inp-vc-lname').value.trim();
+                    const phone_vc = document.getElementById('inp-vc-phone').value.trim();
+                    const email_vc = document.getElementById('inp-vc-email').value.trim();
+                    const company = document.getElementById('inp-vc-company').value.trim();
+                    const address = document.getElementById('inp-vc-address').value.trim();
+                    
+                    if(!fname && !phone_vc) return ' ';
+
+                    let vcard = "BEGIN:VCARD\r\nVERSION:3.0\r\n";
+                    vcard += `N:${lname};${fname};;;\r\n`;
+                    let fullName = `${fname} ${lname}`.trim();
+                    vcard += `FN:${fullName}\r\n`;
+                    if (phone_vc) vcard += `TEL;TYPE=CELL:${phone_vc}\r\n`;
+                    if (email_vc) vcard += `EMAIL;TYPE=INTERNET:${email_vc}\r\n`;
+                    if (company)  vcard += `ORG:${company}\r\n`;
+                    if (address)  vcard += `ADR;TYPE=HOME:;;${address};;;;\r\n`;
+                    vcard += "END:VCARD";
+                    return vcard;
+
+                case 'text':
+                    return document.getElementById('inp-text').value || ' ';
+                case 'wifi':
+                    const ssid = document.getElementById('inp-wifi-ssid').value;
+                    const pass = document.getElementById('inp-wifi-pass').value;
+                    const enc = document.getElementById('inp-wifi-enc').value;
+                    if(!ssid) return ' ';
+                    const escape = (str) => str.replace(/([\\;:])/g, "\\$1");
+                    return `WIFI:T:${enc};S:${escape(ssid)};P:${escape(pass)};;`;
+                case 'phone':
+                    const phone = document.getElementById('inp-phone').value;
+                    return phone ? `tel:${phone}` : ' ';
+                case 'email':
+                    const to = document.getElementById('inp-email-to').value;
+                    const sub = document.getElementById('inp-email-sub').value;
+                    const body = document.getElementById('inp-email-body').value;
+                    if(!to) return ' ';
+                    return `mailto:${to}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
+                default: return ' ';
+            }
+        }
+
+        window.updateQR = function() {
+            if(!window.qrCodeInstance) return;
+            let payload = window.getPayload();
+            
+            // UTF-8 Conversion for correct scanning in Thai/Unicode
+            try {
+                payload = unescape(encodeURIComponent(payload));
+            } catch(e) {
+                console.error("UTF-8 Encoding Error:", e);
+            }
+
+            window.designState.pattern = document.getElementById('inp-pattern').value;
+
+            window.qrCodeInstance.update({
+                data: payload,
+                dotsOptions: getDotsOptions(window.designState),
+                backgroundOptions: { color: window.designState.bgColor },
+                image: window.currentLogoUrl
+            });
+        }
+
+        window.shortenUrl = async function() {
+            const urlInput = document.getElementById('inp-url').value;
+            if(!urlInput) return window.showToast("กรุณากรอก URL ก่อนย่อลิงก์");
+            
+            const btn = document.getElementById('btn-shorten');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'กำลังย่อ...';
+            btn.disabled = true;
+
+            try {
+                if(!window.createShortLink) {
+                    window.showToast("ระบบฐานข้อมูลยังไม่พร้อม กรุณารอสักครู่");
+                    return;
+                }
+                const shortUrl = await window.createShortLink(urlInput);
+                if(shortUrl) {
+                    window.shortenedUrl = shortUrl;
+                    const resContainer = document.getElementById('short-url-result');
+                    const linkEl = document.getElementById('short-url-link');
+                    linkEl.href = window.shortenedUrl;
+                    linkEl.textContent = window.shortenedUrl;
+                    resContainer.classList.remove('hidden');
+                    window.showToast("ย่อลิงก์สำเร็จ!");
+                    window.updateQR();
+                } else {
+                    window.showToast("ไม่สามารถย่อลิงก์ได้");
+                }
+            } catch(e) {
+                window.showToast("เกิดข้อผิดพลาดในการสร้างลิงก์");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        window.switchTab = function(tabId) {
+            window.currentTab = tabId;
+            window.shortenedUrl = '';
+            document.getElementById('short-url-result').classList.add('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            activeTab.classList.add('active');
+            activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+            const forms = ['url', 'promptpay', 'vcard', 'text', 'wifi', 'phone', 'email'];
+            forms.forEach(f => document.getElementById(`form-${f}`).classList.add('hidden'));
+            document.getElementById(`form-${tabId}`).classList.remove('hidden');
+
+            window.updateQR();
+        }
+
+        // Design Handlers
+        window.setDotsColor = function(color, btnEl) {
+            window.designState.dotsColor = color;
+            document.querySelectorAll('#dots-colors .color-btn').forEach(b => b.classList.remove('active'));
+            if(btnEl) btnEl.classList.add('active');
+            window.updateQR();
+        }
+        window.setDotsColor2 = function(color) {
+            window.designState.dotsColor2 = color;
+            window.updateQR();
+        }
+        window.toggleGradient = function() {
+            window.designState.useGradient = document.getElementById('inp-use-gradient').checked;
+            const c2 = document.getElementById('gradient-color-2-container');
+            if(window.designState.useGradient) c2.classList.remove('hidden');
+            else c2.classList.add('hidden');
+            window.updateQR();
+        }
+        window.setBgColor = function(color, btnEl) {
+            window.designState.bgColor = color;
+            document.querySelectorAll('#bg-colors .color-btn').forEach(b => b.classList.remove('active'));
+            if(btnEl) btnEl.classList.add('active');
+            window.updateQR();
+        }
+
+        window.handleLogoUpload = function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                window.currentLogoUrl = event.target.result;
+                document.getElementById('btn-remove-logo').classList.remove('hidden');
+                window.updateQR();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        window.removeLogo = function() {
+            window.currentLogoUrl = null;
+            document.getElementById('inp-logo').value = '';
+            document.getElementById('btn-remove-logo').classList.add('hidden');
+            window.updateQR();
+        }
+
+        window.updateFramePreview = function() {
+            const type = document.getElementById('inp-frame-type').value;
+            let text = document.getElementById('inp-frame-text').value;
+            if(!text && type !== 'none') text = 'SCAN ME'; 
+            const color = document.getElementById('inp-frame-color').value;
+
+            window.designState.frameType = type;
+            window.designState.frameText = text;
+            window.designState.frameColor = color;
+
+            const zone = document.getElementById('qr-frame-export-zone');
+            const textBox = document.getElementById('qr-frame-text-box');
+            const qrContainer = document.getElementById('qr-canvas-container');
+            const frameInputGroup = document.getElementById('frame-text-input-group');
+
+            zone.style.backgroundColor = 'transparent';
+            zone.className = 'relative inline-flex flex-col items-center justify-center rounded-none';
+            textBox.classList.add('hidden');
+            qrContainer.className = 'bg-white p-2 flex items-center justify-center relative z-10 transition-all duration-300';
+            
+            if(type === 'none') {
+                frameInputGroup.classList.add('hidden');
+                qrContainer.classList.add('rounded-lg');
+            } else {
+                frameInputGroup.classList.remove('hidden');
+                zone.style.backgroundColor = color;
+                textBox.textContent = text;
+                textBox.classList.remove('hidden');
+
+                if (type === 'rounded') {
+                    zone.className = 'relative inline-flex flex-col items-center justify-center px-3 pb-3 pt-2 rounded-3xl shadow-sm';
+                    qrContainer.classList.add('rounded-2xl');
+                } else if (type === 'square') {
+                    zone.className = 'relative inline-flex flex-col items-center justify-center px-3 pb-3 pt-2 rounded-none shadow-sm';
+                    qrContainer.classList.add('rounded-none');
+                }
+            }
+        }
+
+        window.getExportCanvas = async function() {
+            if (window.designState.frameType === 'none') {
+                return document.querySelector('#qr-canvas-container canvas');
+            }
+            const exportZone = document.getElementById('qr-frame-export-zone');
+            return await html2canvas(exportZone, { backgroundColor: null, scale: 3, logging: false, useCORS: true });
+        }
+
+        window.downloadPNG = async function() {
+            if(!window.qrCodeInstance) return;
+            if (window.designState.frameType === 'none') {
+                window.qrCodeInstance.download({ name: "qrcode_pro", extension: "png" });
+                window.showToast("ดาวน์โหลด PNG สำเร็จ!");
+            } else {
+                window.showToast("กำลังสร้างรูปพร้อมกรอบ...");
+                const canvas = await window.getExportCanvas();
+                const link = document.createElement('a');
+                link.download = 'qrcode_pro_framed.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                window.showToast("ดาวน์โหลด PNG สำเร็จ!");
+            }
+        }
+
+        window.downloadSVG = function() {
+            if(!window.qrCodeInstance) return;
+            if (window.designState.frameType !== 'none') {
+                const confirmDL = confirm("ไฟล์ SVG จะได้เฉพาะตัวคิวอาร์โค้ดเท่านั้น (ไม่รวมกรอบข้อความ) ยืนยันโหลดต่อหรือไม่?");
+                if(!confirmDL) return;
+            }
+            window.qrCodeInstance.download({ name: "qrcode_pro_vector", extension: "svg" });
+            window.showToast("ดาวน์โหลด SVG สำเร็จ!");
+        }
+
+        window.copyImage = async function() {
+            const rawCanvas = document.querySelector('#qr-canvas-container canvas');
+            if(!rawCanvas) { window.showToast("เกิดข้อผิดพลาด"); return; }
+            try {
+                window.showToast("กำลังคัดลอกรูปภาพ...");
+                const canvasToCopy = await window.getExportCanvas();
+                canvasToCopy.toBlob(async (blob) => {
+                    try {
+                        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+                        window.showToast("คัดลอกรูปภาพแล้ว");
+                    } catch(err) { window.showToast("เบราว์เซอร์ของคุณไม่รองรับการคัดลอกรูปภาพ"); }
+                });
+            } catch(e) { window.showToast("เกิดข้อผิดพลาดในการสร้างภาพ"); }
+        }
+
+        window.copyLink = function() {
+            const data = window.getPayload();
+            if(data && data.trim() !== '') {
+                const el = document.createElement('textarea');
+                el.value = data; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+                window.showToast("คัดลอกข้อมูล/ลิงก์แล้ว");
+            } else { window.showToast("ไม่มีข้อมูลให้คัดลอก"); }
+        }
+
+        window.shareQR = async function() {
+            const rawCanvas = document.querySelector('#qr-canvas-container canvas');
+            if (navigator.share && rawCanvas) {
+                try {
+                    window.showToast("กำลังเตรียมไฟล์แชร์...");
+                    const exportCanvas = await window.getExportCanvas();
+                    exportCanvas.toBlob(async (blob) => {
+                        try {
+                            await navigator.share({ title: 'แชร์ QR Code', files: [new File([blob], "qrcode.png", { type: "image/png" })] });
+                        } catch(e) {
+                            const data = window.getPayload();
+                            if(data.length < 200) navigator.share({ title: 'QR Data', text: data }).catch(e=>{});
+                        }
+                    });
+                } catch(err) { window.showToast("แชร์ภาพล้มเหลว"); }
+            } else { window.showToast("อุปกรณ์นี้ไม่รองรับการแชร์โดยตรง"); }
+        }
+
+        let toastTimeout;
+        window.showToast = function(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.classList.add("show");
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => { toast.classList.remove("show"); }, 3000);
+        }
+
+        window.addEventListener('load', initQR);
+    </script>
+
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+                let firebaseConfig = {
+            apiKey: "AIzaSyCoVVEFc1vTU5b5Fx2Jrd1DamYWIIyXPyA",
+            authDomain: "studentmanage-c1bf4.firebaseapp.com",
+            projectId: "studentmanage-c1bf4",
+            storageBucket: "studentmanage-c1bf4.firebasestorage.app",
+            messagingSenderId: "753672108518",
+            appId: "1:753672108518:web:16560d5582227ba33cfe27"
+        };
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                const parsedConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+                if (parsedConfig && Object.keys(parsedConfig).length > 0) {
+                    firebaseConfig = parsedConfig;
+                }
+            }
+        } catch (e) { console.warn("ใช้ Default Config"); }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+        googleProvider.setCustomParameters({ prompt: 'select_account consent' });
+        
+        const appId = (typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'qr-pro-app';
+        const getCollectionPath = () => `artifacts/${appId}/users/${auth.currentUser.uid}/qrcodes`;
+
+        const btnLogin = document.getElementById('btn-login');
+        const btnLogout = document.getElementById('btn-logout');
+        const userMenu = document.getElementById('user-menu');
+        const userAvatar = document.getElementById('user-avatar');
+
+        // จัดการ Auth พื้นฐาน
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
+            } else {
+                try {
+                    if (!auth.currentUser) await signInAnonymously(auth);
+                } catch(e) { console.error(e); }
+            }
+
+            // ระบบ Redirect ของ URL Shortener
+            const urlParams = new URLSearchParams(window.location.search);
+            const shortCode = urlParams.get('l');
+            if (shortCode) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shortlinks', shortCode);
+                    const snap = await getDoc(docRef);
+                    if (snap.exists()) {
+                        window.location.replace(snap.data().originalUrl);
+                    } else {
+                        document.getElementById('redirect-error').classList.remove('hidden');
+                        document.getElementById('btn-redirect-home').classList.remove('hidden');
+                        document.getElementById('redirect-spinner').classList.add('hidden');
+                    }
+                } catch (err) {
+                    document.getElementById('redirect-error').textContent = "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล หรือลิงก์ถูกจำกัดสิทธิ์";
+                    document.getElementById('redirect-error').classList.remove('hidden');
+                    document.getElementById('btn-redirect-home').classList.remove('hidden');
+                    document.getElementById('redirect-spinner').classList.add('hidden');
+                }
+            }
+        };
+
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            // โชว์เมนูผู้ใช้เฉพาะคนที่ล็อกอิน Google จริงๆ (ไม่ใช่ Anonymous)
+            if (user && !user.isAnonymous) {
+                btnLogin.classList.add('hidden');
+                userMenu.classList.remove('hidden');
+                userMenu.classList.add('flex');
+                userAvatar.src = user.photoURL || `https://ui-avatars.com/api/?name=${user.email}&background=5D4037&color=fff`;
+            } else {
+                btnLogin.classList.remove('hidden');
+                userMenu.classList.add('hidden');
+                userMenu.classList.remove('flex');
+            }
+        });
+
+        // เปิดให้ระบบภายนอกใช้ฟังก์ชันสร้างลิงก์ย่อได้
+        window.createShortLink = async (longUrl) => {
+            const generateCode = () => Math.random().toString(36).substring(2, 8);
+            let code = generateCode();
+            let docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shortlinks', code);
+            
+            let isUnique = false;
+            let attempts = 0;
+            while (!isUnique && attempts < 5) {
+                const snap = await getDoc(docRef);
+                if (!snap.exists()) {
+                    isUnique = true;
+                } else {
+                    code = generateCode();
+                    docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shortlinks', code);
+                    attempts++;
+                }
+            }
+            if (!isUnique) throw new Error("ไม่สามารถสร้างรหัสซ้ำได้");
+            await setDoc(docRef, { originalUrl: longUrl, createdAt: Date.now() });
+            const baseUrl = window.location.origin + window.location.pathname;
+            return `${baseUrl}?l=${code}`;
+        };
+
+        btnLogin.addEventListener('click', async () => {
+            if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.apiKey === "dummy-key") return window.showToast("กรุณาใส่ Firebase Config ของคุณ");
+            btnLogin.disabled = true;
+            const originalContent = btnLogin.innerHTML;
+            btnLogin.innerHTML = '<svg class="animate-spin w-4 h-4 text-primary mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังโหลด...';
+            try {
+                await signInWithPopup(auth, googleProvider);
+                window.showToast("เข้าสู่ระบบสำเร็จ");
+            } catch (error) {
+                if (error.code === 'auth/cancelled-popup-request') window.showToast("การเข้าสู่ระบบถูกยกเลิก");
+                else if (error.code === 'auth/popup-blocked') window.showToast("เบราว์เซอร์บล็อก Popup");
+                else window.showToast("เกิดข้อผิดพลาด: " + error.message);
+            } finally {
+                btnLogin.disabled = false;
+                btnLogin.innerHTML = originalContent;
+            }
+        });
+
+        btnLogout.addEventListener('click', async () => {
+            await signOut(auth);
+            // เมื่อ Sign out ให้เปลี่ยนกลับเป็น Anonymous เพื่อให้ย่อลิงก์ได้ต่อ
+            await signInAnonymously(auth);
+            window.showToast("ออกจากระบบแล้ว");
+        });
+
+        document.getElementById('btn-save-db').addEventListener('click', async () => {
+            if (!auth.currentUser || auth.currentUser.isAnonymous) {
+                return window.showToast("กรุณาเข้าสู่ระบบด้วย Google ก่อนบันทึกข้อมูล");
+            }
+            
+            const payload = window.getPayload();
+            if (!payload || payload.trim() === '') return window.showToast("ไม่มีข้อมูลสำหรับบันทึก");
+
+            const dataToSave = {
+                url: document.getElementById('inp-url').value,
+                shortUrl: window.shortenedUrl,
+                vcFname: document.getElementById('inp-vc-fname') ? document.getElementById('inp-vc-fname').value : '',
+                vcLname: document.getElementById('inp-vc-lname') ? document.getElementById('inp-vc-lname').value : '',
+                vcPhone: document.getElementById('inp-vc-phone') ? document.getElementById('inp-vc-phone').value : '',
+                vcEmail: document.getElementById('inp-vc-email') ? document.getElementById('inp-vc-email').value : '',
+                vcCompany: document.getElementById('inp-vc-company') ? document.getElementById('inp-vc-company').value : '',
+                vcAddress: document.getElementById('inp-vc-address') ? document.getElementById('inp-vc-address').value : '',
+                promptpayId: document.getElementById('inp-pp-id').value,
+                promptpayAmount: document.getElementById('inp-pp-amount').value,
+                text: document.getElementById('inp-text').value,
+                wifiSsid: document.getElementById('inp-wifi-ssid').value,
+                wifiPass: document.getElementById('inp-wifi-pass').value,
+                wifiEnc: document.getElementById('inp-wifi-enc').value,
+                phone: document.getElementById('inp-phone').value,
+                emailTo: document.getElementById('inp-email-to').value,
+                emailSub: document.getElementById('inp-email-sub').value,
+                emailBody: document.getElementById('inp-email-body').value,
+            };
+
+            const btn = document.getElementById('btn-save-db');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'กำลังบันทึก...';
+            btn.disabled = true;
+
+            try {
+                await addDoc(collection(db, getCollectionPath()), {
+                    type: window.currentTab,
+                    data: dataToSave,
+                    design: window.designState,
+                    payload: payload,
+                    createdAt: Date.now()
+                });
+                window.showToast("บันทึกข้อมูลลงฐานข้อมูลสำเร็จ");
+            } catch (err) {
+                console.error(err);
+                window.showToast("เกิดข้อผิดพลาดในการบันทึก");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        // ดึงประวัติเฉพาะ User ที่ล็อกอิน Google
+        window.fetchAndRenderHistory = async () => {
+            if (!auth.currentUser || auth.currentUser.isAnonymous) {
+                document.getElementById('history-empty').textContent = "กรุณาเข้าสู่ระบบด้วย Google เพื่อดูประวัติ";
+                document.getElementById('history-empty').classList.remove('hidden');
+                document.getElementById('history-grid').innerHTML = '';
+                return;
+            }
+
+            const grid = document.getElementById('history-grid');
+            const emptyState = document.getElementById('history-empty');
+            const loader = document.getElementById('history-loading');
+            
+            loader.classList.remove('hidden');
+            
+            try {
+                const q = collection(db, getCollectionPath());
+                const querySnapshot = await getDocs(q);
+                
+                let historyCache = [];
+                querySnapshot.forEach((doc) => {
+                    historyCache.push({ id: doc.id, ...doc.data() });
+                });
+
+                historyCache.sort((a, b) => b.createdAt - a.createdAt);
+
+                grid.innerHTML = '';
+                if (historyCache.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    
+                    historyCache.forEach(item => {
+                        let typeLabels = { 'url': 'ลิงก์ URL', 'promptpay': 'PromptPay', 'vcard': 'นามบัตร', 'text': 'ข้อความ', 'wifi': 'WiFi', 'phone': 'โทรศัพท์', 'email': 'อีเมล' };
+                        let dateStr = new Date(item.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+                        
+                        let snippet = item.payload;
+                        try { snippet = decodeURIComponent(escape(snippet)); } catch(e){}
+                        if(snippet.length > 50) snippet = snippet.substring(0, 50) + '...';
+
+                        const card = document.createElement('div');
+                        card.className = "bg-white border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition flex flex-col justify-between";
+                        
+                        // สร้างปุ่ม HTML เป็น string ให้เรียกใช้ฟังก์ชันใน window พร้อมส่งข้อมูล item
+                        const btnRecreate = document.createElement('button');
+                        btnRecreate.className = "flex-1 bg-choco-50 text-primary text-xs font-medium py-2 rounded-lg hover:bg-choco-100 border border-choco-100";
+                        btnRecreate.textContent = "ดึงข้อมูลมาสร้างใหม่";
+                        btnRecreate.onclick = () => window.recreateFromHistoryItem(item);
+
+                        const btnDelete = document.createElement('button');
+                        btnDelete.className = "text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg";
+                        btnDelete.title = "ลบ";
+                        btnDelete.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
+                        btnDelete.onclick = () => window.deleteHistoryItem(item.id);
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.innerHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="bg-choco-100 text-primary text-xs font-bold px-2 py-1 rounded">${typeLabels[item.type] || 'Unknown'}</span>
+                                <span class="text-xs text-gray-400">${dateStr}</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-4 break-all line-clamp-2">${snippet}</p>
+                        `;
+
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = "flex gap-2 mt-auto";
+                        actionsDiv.appendChild(btnRecreate);
+                        actionsDiv.appendChild(btnDelete);
+
+                        card.appendChild(infoDiv);
+                        card.appendChild(actionsDiv);
+                        grid.appendChild(card);
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+                window.showToast("โหลดประวัติไม่สำเร็จ");
+            } finally {
+                loader.classList.add('hidden');
+            }
+        };
+
+        window.deleteHistoryItem = async (id) => {
+            if(!confirm("คุณต้องการลบประวัตินี้ใช่หรือไม่?")) return;
+            try {
+                await deleteDoc(doc(db, getCollectionPath(), id));
+                window.showToast("ลบข้อมูลแล้ว");
+                window.fetchAndRenderHistory();
+            } catch(e) {
+                window.showToast("ลบไม่สำเร็จ");
+            }
+        };
+
+        window.recreateFromHistoryItem = (item) => {
+            if(item.data) {
+                if(item.data.url && document.getElementById('inp-url')) document.getElementById('inp-url').value = item.data.url;
+                window.shortenedUrl = item.data.shortUrl || '';
+                
+                if(document.getElementById('inp-vc-fname')) document.getElementById('inp-vc-fname').value = item.data.vcFname || '';
+                if(document.getElementById('inp-vc-lname')) document.getElementById('inp-vc-lname').value = item.data.vcLname || '';
+                if(document.getElementById('inp-vc-phone')) document.getElementById('inp-vc-phone').value = item.data.vcPhone || '';
+                if(document.getElementById('inp-vc-email')) document.getElementById('inp-vc-email').value = item.data.vcEmail || '';
+                if(document.getElementById('inp-vc-company')) document.getElementById('inp-vc-company').value = item.data.vcCompany || '';
+                if(document.getElementById('inp-vc-address')) document.getElementById('inp-vc-address').value = item.data.vcAddress || '';
+
+                if(document.getElementById('inp-pp-id')) document.getElementById('inp-pp-id').value = item.data.promptpayId || '';
+                if(document.getElementById('inp-pp-amount')) document.getElementById('inp-pp-amount').value = item.data.promptpayAmount || '';
+                if(document.getElementById('inp-text')) document.getElementById('inp-text').value = item.data.text || '';
+                if(document.getElementById('inp-wifi-ssid')) document.getElementById('inp-wifi-ssid').value = item.data.wifiSsid || '';
+                if(document.getElementById('inp-wifi-pass')) document.getElementById('inp-wifi-pass').value = item.data.wifiPass || '';
+                if(document.getElementById('inp-wifi-enc')) document.getElementById('inp-wifi-enc').value = item.data.wifiEnc || 'WPA';
+                if(document.getElementById('inp-phone')) document.getElementById('inp-phone').value = item.data.phone || '';
+                if(document.getElementById('inp-email-to')) document.getElementById('inp-email-to').value = item.data.emailTo || '';
+                if(document.getElementById('inp-email-sub')) document.getElementById('inp-email-sub').value = item.data.emailSub || '';
+                if(document.getElementById('inp-email-body')) document.getElementById('inp-email-body').value = item.data.emailBody || '';
+            }
+
+            if(item.design) {
+                window.designState = { ...window.designState, ...item.design };
+                
+                document.getElementById('inp-pattern').value = window.designState.pattern || 'square';
+                document.getElementById('inp-use-gradient').checked = window.designState.useGradient || false;
+                
+                document.getElementById('inp-frame-type').value = window.designState.frameType || 'none';
+                document.getElementById('inp-frame-text').value = window.designState.frameText || '';
+                document.getElementById('inp-frame-color').value = window.designState.frameColor || '#5D4037';
+                
+                const c2 = document.getElementById('gradient-color-2-container');
+                if(window.designState.useGradient) c2.classList.remove('hidden');
+                else c2.classList.add('hidden');
+                
+                document.querySelectorAll('#dots-colors .color-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#bg-colors .color-btn').forEach(b => b.classList.remove('active'));
+                
+                window.updateFramePreview();
+            }
+
+            window.switchTab(item.type);
+            window.closeHistoryModal();
+            window.showToast("ดึงข้อมูลและดีไซน์สำเร็จ");
+        };
+
+        window.openHistoryModal = () => {
+            const modal = document.getElementById('history-modal');
+            modal.classList.add('modal-enter-active');
+            window.fetchAndRenderHistory();
+        };
+    </script>
+</body>
+</html>
